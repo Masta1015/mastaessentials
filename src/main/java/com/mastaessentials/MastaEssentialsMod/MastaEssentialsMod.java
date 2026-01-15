@@ -1,5 +1,6 @@
-package com.example.examplemod;
+package com.mastaessentials.MastaEssentialsMod;
 
+import com.mastaessentials.Config;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
@@ -29,8 +30,8 @@ import net.minecraftforge.registries.RegistryObject;
 import org.slf4j.Logger;
 
 // The value here should match an entry in the META-INF/mods.toml file
-@Mod(ExampleMod.MODID)
-public class ExampleMod
+@Mod(MastaEssentialsMod.MODID)
+public class MastaEssentialsMod
 {
     // Define mod id in a common place for everything to reference
     public static final String MODID = "examplemod";
@@ -60,7 +61,7 @@ public class ExampleMod
                 output.accept(EXAMPLE_ITEM.get()); // Add the example item to the tab. For your own tabs, this method is preferred over the event
             }).build());
 
-    public ExampleMod(FMLJavaModLoadingContext context)
+    public MastaEssentialsMod(FMLJavaModLoadingContext context)
     {
         IEventBus modEventBus = context.getModEventBus();
 
