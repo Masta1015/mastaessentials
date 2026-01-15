@@ -10,6 +10,7 @@ import net.minecraft.network.chat.Component;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.user.User;
+import net.minecraftforge.fml.ModList;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -89,18 +90,19 @@ public class HomeCommand {
     }
 
     private static int getMaxHomes(ServerPlayer player) {
+        if (!ModList.get().isLoaded("luckperms")) {
+            return 1;
+        }
         try {
             LuckPerms api = LuckPermsProvider.get();
             User user = api.getUserManager().getUser(player.getUUID());
-            if (user == null) return 1; // fallback
-
+            if (user == null) return 1;
             if (user.getCachedData().getPermissionData().checkPermission("home.6").asBoolean()) return 6;
             if (user.getCachedData().getPermissionData().checkPermission("home.3").asBoolean()) return 3;
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-        return 1; // default
+        return 1;
     }
 
     // Simple class to store a position

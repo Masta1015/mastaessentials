@@ -28,6 +28,8 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import org.slf4j.Logger;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import com.mastaessentials.commands.HomeCommand;
 
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(MastaEssentialsMod.MODID)
@@ -112,6 +114,12 @@ public class MastaEssentialsMod
         // Do something when the server starts
         LOGGER.info("HELLO from server starting");
     }
+
+    @SubscribeEvent
+    public void onRegisterCommands(RegisterCommandsEvent event) {
+        HomeCommand.register(event.getDispatcher());
+    }
+
 
     // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
     @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
