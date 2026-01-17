@@ -5,12 +5,14 @@ import com.mastaessentials.commands.HomeCommand;
 import com.mastaessentials.rankup.RankCommand;
 import com.mastaessentials.afk.AfkManager;
 import com.mastaessentials.JoinandLeave.JoinLeaveMessages;
-import com.mastaessentials.deathmessages.DeathMessages; // <-- ADD THIS
+import com.mastaessentials.deathmessages.DeathMessages;
+import com.mastaessentials.tpa.TpaManager; // <-- ADD THIS
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
+import com.mastaessentials.chat.ChatManager;
 
 public class ReloadCommand {
 
@@ -39,6 +41,10 @@ public class ReloadCommand {
 
             // ⚡ Reload Death messages
             DeathMessages.loadConfig();
+
+            // 🌀 Reload TPA config
+            TpaManager.loadConfig(); // <-- This will reload Tpa.json
+            ChatManager.loadConfig();
         }
 
         MastaEssentialsMod.reloadConfigs();

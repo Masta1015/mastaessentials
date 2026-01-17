@@ -31,6 +31,8 @@ import org.slf4j.Logger;
 import com.mastaessentials.rankup.RankCommand;
 import com.mastaessentials.commands.ReloadCommand;
 
+import com.mastaessentials.chat.ChatManager;
+
 @Mod(MastaEssentialsMod.MODID)
 public class MastaEssentialsMod {
     public static final String MODID = "mastaessentials";
@@ -78,6 +80,7 @@ public class MastaEssentialsMod {
         // Load homes JSON on server start
         HomeCommand.loadHomes(event.getServer());
         RankCommand.loadConfig(event.getServer());
+        ChatManager.loadConfig();
     }
 
     @SubscribeEvent
