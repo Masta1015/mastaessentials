@@ -1,4 +1,4 @@
-package com.mastaessentials.MastaEssentialsMod;
+package com.mastaessentials;
 
 import com.mastaessentials.commands.HomeCommand;
 import com.mojang.logging.LogUtils;
@@ -28,6 +28,9 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import org.slf4j.Logger;
 
+import com.mastaessentials.rankup.RankCommand;
+import com.mastaessentials.commands.ReloadCommand;
+
 @Mod(MastaEssentialsMod.MODID)
 public class MastaEssentialsMod {
     public static final String MODID = "mastaessentials";
@@ -49,6 +52,10 @@ public class MastaEssentialsMod {
             .displayItems((parameters, output) -> output.accept(EXAMPLE_ITEM.get()))
             .build());
 
+    public static void reloadConfigs() {
+        LOGGER.info("MastaEssentials reloaded!"); // works here
+    }
+
     public MastaEssentialsMod() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
 
@@ -65,22 +72,19 @@ public class MastaEssentialsMod {
     }
 
     @SubscribeEvent
-    public void addCreative(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS)
-            event.accept(EXAMPLE_BLOCK_ITEM);
-    }
-
-    @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
-        LOGGER.info("HELLO FROM SERVER STARTING");
+        LOGGER.info("RankCommand, HomeCommand are starting!");
 
         // Load homes JSON on server start
         HomeCommand.loadHomes(event.getServer());
+        RankCommand.loadConfig(event.getServer());
     }
 
     @SubscribeEvent
-    public void onRegisterCommands(RegisterCommandsEvent event) {
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
         HomeCommand.register(event.getDispatcher());
+        RankCommand.register(event.getDispatcher());
+        ReloadCommand.register(event.getDispatcher());
     }
 
     @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
