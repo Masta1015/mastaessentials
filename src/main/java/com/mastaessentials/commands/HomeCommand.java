@@ -80,19 +80,39 @@ public class HomeCommand {
         dispatcher.register(
                 Commands.literal("delhome")
                         .then(Commands.argument("name", StringArgumentType.word())
+                                .suggests((context, builder) -> {
+                                    ServerPlayer player = context.getSource().getPlayer();
+                                    if (player == null) {
+                                        return builder.buildFuture();
+                                    }
+
+                                    Map<String, HomePosition> playerHomes = homes.get(player.getUUID());
+                                    if (playerHomes != null) {
+                                        for (String homeName : playerHomes.keySet()) {
+                                            builder.suggest(homeName);
+                                        }
+                                    }
+
+                                    return builder.buildFuture();
+                                })
                                 .executes(context -> {
                                     ServerPlayer player = context.getSource().getPlayerOrException();
                                     String inputName = StringArgumentType.getString(context, "name");
                                     String homeName = findHomeIgnoreCase(player, inputName);
 
                                     if (homeName == null) {
-                                        player.sendSystemMessage(Component.literal("Home '" + inputName + "' does not exist."));
+                                        player.sendSystemMessage(
+                                                Component.literal("Home '" + inputName + "' does not exist.")
+                                        );
                                         return 0;
                                     }
 
                                     homes.get(player.getUUID()).remove(homeName);
                                     saveHomes();
-                                    player.sendSystemMessage(Component.literal("Home '" + homeName + "' deleted!"));
+
+                                    player.sendSystemMessage(
+                                            Component.literal("Home '" + homeName + "' deleted!")
+                                    );
                                     return 1;
                                 })
                         )
@@ -102,30 +122,54 @@ public class HomeCommand {
         dispatcher.register(
                 Commands.literal("home")
                         .then(Commands.argument("name", StringArgumentType.word())
+                                .suggests((context, builder) -> {
+                                    ServerPlayer player = context.getSource().getPlayer();
+                                    if (player == null) {
+                                        return builder.buildFuture();
+                                    }
+
+                                    Map<String, HomePosition> playerHomes = homes.get(player.getUUID());
+                                    if (playerHomes != null) {
+                                        for (String homeName : playerHomes.keySet()) {
+                                            builder.suggest(homeName);
+                                        }
+                                    }
+
+                                    return builder.buildFuture();
+                                })
                                 .executes(context -> {
                                     ServerPlayer player = context.getSource().getPlayerOrException();
                                     String inputName = StringArgumentType.getString(context, "name");
 
-                                    // Use case-insensitive lookup
+                                    // Case-insensitive lookup
                                     String homeName = findHomeIgnoreCase(player, inputName);
                                     if (homeName == null) {
-                                        player.sendSystemMessage(Component.literal("Home '" + inputName + "' does not exist."));
+                                        player.sendSystemMessage(
+                                                Component.literal("Home '" + inputName + "' does not exist.")
+                                        );
                                         return 0;
                                     }
 
-                                    HomePosition pos = homes.get(player.getUUID()).get(homeName); // Now guaranteed to exist
+                                    HomePosition pos = homes.get(player.getUUID()).get(homeName);
 
                                     long now = System.currentTimeMillis();
-                                    Long last = lastTeleport.getOrDefault(player.getUUID(), 0L);
+                                    long last = lastTeleport.getOrDefault(player.getUUID(), 0L);
                                     if (now - last < COOLDOWN) {
-                                        player.sendSystemMessage(Component.literal("You must wait before teleporting again."));
+                                        player.sendSystemMessage(
+                                                Component.literal("You must wait before teleporting again.")
+                                        );
                                         return 0;
                                     }
 
-                                    player.sendSystemMessage(Component.literal("Teleporting to home '" + homeName + "' in 10 seconds... Do not move."));
+                                    player.sendSystemMessage(
+                                            Component.literal("Teleporting to home '" + homeName + "' in 10 seconds... Do not move.")
+                                    );
 
-                                    // Schedule teleport (200 ticks = 10 seconds)
-                                    scheduledTeleports.put(player.getUUID(), new ScheduledTeleport(player, pos, 200));
+                                    scheduledTeleports.put(
+                                            player.getUUID(),
+                                            new ScheduledTeleport(player, pos, 200)
+                                    );
+
                                     return 1;
                                 })
                         )
