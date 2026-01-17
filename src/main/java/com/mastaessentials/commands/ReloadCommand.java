@@ -3,6 +3,7 @@ package com.mastaessentials.commands;
 import com.mastaessentials.MastaEssentialsMod;
 import com.mastaessentials.commands.HomeCommand;
 import com.mastaessentials.rankup.RankCommand;
+import com.mastaessentials.afk.AfkManager; // <--- import AFK manager
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -29,6 +30,9 @@ public class ReloadCommand {
 
             // Reload rank config
             RankCommand.loadConfig(server);
+
+            // Reload AFK config
+            AfkManager.loadConfig();
         }
 
         MastaEssentialsMod.reloadConfigs(); // optional additional reload logic

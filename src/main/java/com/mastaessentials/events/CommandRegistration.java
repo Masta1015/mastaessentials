@@ -1,8 +1,9 @@
 package com.mastaessentials.events;
 
 import com.mastaessentials.commands.HomeCommand;
-import com.mastaessentials.rankup.RankCommand;
 import com.mastaessentials.commands.ReloadCommand;
+import com.mastaessentials.rankup.RankCommand;
+import com.mastaessentials.afk.AfkManager;
 
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
@@ -20,12 +21,15 @@ public class CommandRegistration {
         HomeCommand.register(event.getDispatcher());
         RankCommand.register(event.getDispatcher());
         ReloadCommand.register(event.getDispatcher());
+        AfkManager.register(event.getDispatcher()); // <--- ADD THIS
     }
+
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         HomeCommand.loadHomes(event.getServer());
-        RankCommand.loadConfig(event.getServer()); // load or create JSON
+        RankCommand.loadConfig(event.getServer());
+        AfkManager.loadConfig(); // <--- optional, to load AFK settings at server start
     }
-
 }
+
 
