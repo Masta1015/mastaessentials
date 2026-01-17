@@ -8,7 +8,6 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.event.ServerChatEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.TickEvent.ServerTickEvent;
@@ -18,6 +17,9 @@ import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.loading.FMLPaths;
+import net.luckperms.api.LuckPerms;
+import net.luckperms.api.LuckPermsProvider;
+import net.luckperms.api.model.user.User;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -35,6 +37,7 @@ public class AfkManager {
 
     private static boolean ENABLED = true;
     private static int KICK_TIME_MINUTES = 15;
+    private static int AUTO_AFK_MINUTES = 5; // idle time before auto-AFK
     private static final Map<String, String> MESSAGES = new HashMap<>();
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -54,6 +57,18 @@ public class AfkManager {
                             return 1;
                         })
         );
+    }
+
+    private static boolean hasNoKickPermission(ServerPlayer player) {
+        try {
+            LuckPerms lp = LuckPermsProvider.get();
+            User user = lp.getUserManager().getUser(player.getUUID());
+            if (user != null) {
+                return user.getCachedData().getPermissionData()
+                        .checkPermission("mastafk.nokick").asBoolean();
+            }
+        } catch (Exception ignored) {}
+        return false;
     }
 
     // -------------------- AFK Logic --------------------
@@ -83,9 +98,8 @@ public class AfkManager {
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-
         if (!(event.player instanceof ServerPlayer)) return;
-        ServerPlayer player = (ServerPlayer) event.player; // classic cast
+        ServerPlayer player = (ServerPlayer) event.player;
 
         Position lastPos = playerPositions.getOrDefault(player.getUUID(),
                 new Position(player.getX(), player.getY(), player.getZ()));
@@ -96,6 +110,7 @@ public class AfkManager {
 
         playerPositions.put(player.getUUID(), new Position(player.getX(), player.getY(), player.getZ()));
     }
+
     @SubscribeEvent
     public static void onPlayerChat(ServerChatEvent event) {
         if (!(event.getPlayer() instanceof ServerPlayer)) return;
@@ -109,17 +124,25 @@ public class AfkManager {
 
         long now = System.currentTimeMillis();
         long kickMillis = KICK_TIME_MINUTES * 60L * 1000L;
+        long autoAfkMillis = AUTO_AFK_MINUTES * 60L * 1000L;
 
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             UUID uuid = player.getUUID();
-
-            // ensure player has lastActive initialized
             lastActive.putIfAbsent(uuid, now);
-
             long last = lastActive.get(uuid);
 
+            // Automatic AFK after idle time
+            if (!afkPlayers.contains(uuid) && now - last >= autoAfkMillis) {
+                afkPlayers.add(uuid);
+                String msg = getMessage("afkEnabled").replace("%player%", player.getName().getString());
+                player.sendSystemMessage(Component.literal(msg));
+            }
+
+            // Skip players with no-kick permission
+            if (hasNoKickPermission(player)) continue;
+
+            // Kick if AFK too long
             if (afkPlayers.contains(uuid) && now - last >= kickMillis) {
-                // Kick player and remove them from afk tracking
                 player.connection.disconnect(Component.literal(getMessage("kick")));
                 afkPlayers.remove(uuid);
                 lastActive.remove(uuid);
@@ -127,7 +150,6 @@ public class AfkManager {
             }
         }
     }
-
 
     // -------------------- Config --------------------
     @SubscribeEvent
@@ -153,6 +175,7 @@ public class AfkManager {
 
                 ENABLED = (Boolean) cfg.getOrDefault("enabled", true);
                 KICK_TIME_MINUTES = ((Double) cfg.getOrDefault("kickTimeMinutes", 15.0)).intValue();
+                AUTO_AFK_MINUTES = ((Double) cfg.getOrDefault("autoAfkMinutes", 5.0)).intValue();
 
                 Map<String, String> messages = (Map<String, String>) cfg.getOrDefault("messages", new HashMap<>());
                 MESSAGES.clear();
@@ -168,13 +191,14 @@ public class AfkManager {
             Map<String, Object> cfg = new LinkedHashMap<>();
             cfg.put("enabled", true);
             cfg.put("kickTimeMinutes", 15);
+            cfg.put("autoAfkMinutes", 5);
 
             Map<String, String> messages = new LinkedHashMap<>();
             messages.put("afkEnabled", "§7%player% is now AFK.");
             messages.put("afkDisabled", "§7%player% is no longer AFK.");
             messages.put("kick", "§cYou were kicked for being AFK too long. Hope to see you on again sometime soon!");
-
             cfg.put("messages", messages);
+
             GSON.toJson(cfg, w);
         } catch (Exception e) {
             e.printStackTrace();
