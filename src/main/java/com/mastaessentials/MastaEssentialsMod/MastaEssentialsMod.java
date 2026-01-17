@@ -61,7 +61,7 @@ public class MastaEssentialsMod {
     }
 
     private void setup(final FMLCommonSetupEvent event) {
-        LOGGER.info("HELLO FROM COMMON SETUP");
+        LOGGER.info("MastaEssentials is now starting up. Good Work!");
     }
 
     @SubscribeEvent
