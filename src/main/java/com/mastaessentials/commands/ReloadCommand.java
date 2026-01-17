@@ -3,7 +3,8 @@ package com.mastaessentials.commands;
 import com.mastaessentials.MastaEssentialsMod;
 import com.mastaessentials.commands.HomeCommand;
 import com.mastaessentials.rankup.RankCommand;
-import com.mastaessentials.afk.AfkManager; // <--- import AFK manager
+import com.mastaessentials.afk.AfkManager;
+import com.mastaessentials.JoinandLeave.JoinLeaveMessages; // <-- ADD THIS
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -14,31 +15,34 @@ public class ReloadCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("reloadmod")
-                .requires(cs -> cs.hasPermission(2)) // OP only
+                .requires(cs -> cs.hasPermission(2))
                 .executes(context -> reload(context.getSource())));
     }
 
     private static int reload(CommandSourceStack source) {
-        MinecraftServer server = source.getServer(); // get server instance
+        MinecraftServer server = source.getServer();
 
         if (server != null) {
-            // Reload Home config first (enabled, warmup, cooldown, messages)
+            // Reload Home config
             HomeCommand.loadConfig();
-
-            // Reload homes data
             HomeCommand.loadHomes(server);
 
-            // Reload rank config
+            // Reload Rank config
             RankCommand.loadConfig(server);
 
             // Reload AFK config
             AfkManager.loadConfig();
+
+            // 🔥 Reload Join / Leave messages
+            JoinLeaveMessages.reloadConfig();
         }
 
-        MastaEssentialsMod.reloadConfigs(); // optional additional reload logic
+        MastaEssentialsMod.reloadConfigs();
 
-        // Notify the player/admin
-        source.sendSuccess(() -> Component.literal("MastaEssentials configs reloaded successfully!"), true);
+        source.sendSuccess(
+                () -> Component.literal("MastaEssentials configs reloaded successfully!"),
+                true
+        );
         return 1;
     }
 }
