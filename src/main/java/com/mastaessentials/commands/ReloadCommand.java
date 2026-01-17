@@ -20,10 +20,15 @@ public class ReloadCommand {
     private static int reload(CommandSourceStack source) {
         MinecraftServer server = source.getServer(); // get server instance
 
-        // Reload mod configs / data
         if (server != null) {
-            HomeCommand.loadHomes(server);   // reload homes
-            RankCommand.loadConfig(server);  // reload rank config
+            // Reload Home config first (enabled, warmup, cooldown, messages)
+            HomeCommand.loadConfig();
+
+            // Reload homes data
+            HomeCommand.loadHomes(server);
+
+            // Reload rank config
+            RankCommand.loadConfig(server);
         }
 
         MastaEssentialsMod.reloadConfigs(); // optional additional reload logic
