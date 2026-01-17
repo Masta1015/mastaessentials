@@ -4,7 +4,8 @@ import com.mastaessentials.MastaEssentialsMod;
 import com.mastaessentials.commands.HomeCommand;
 import com.mastaessentials.rankup.RankCommand;
 import com.mastaessentials.afk.AfkManager;
-import com.mastaessentials.JoinandLeave.JoinLeaveMessages; // <-- ADD THIS
+import com.mastaessentials.JoinandLeave.JoinLeaveMessages;
+import com.mastaessentials.deathmessages.DeathMessages; // <-- ADD THIS
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -35,6 +36,9 @@ public class ReloadCommand {
 
             // 🔥 Reload Join / Leave messages
             JoinLeaveMessages.reloadConfig();
+
+            // ⚡ Reload Death messages
+            DeathMessages.loadConfig();
         }
 
         MastaEssentialsMod.reloadConfigs();

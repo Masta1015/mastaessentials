@@ -1,101 +1,137 @@
 package com.mastaessentials.deathmessages;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.lang.reflect.Type;
+import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 @Mod.EventBusSubscriber
 public class DeathMessages {
 
     private static final Random RANDOM = new Random();
+    private static Map<String, List<String>> messages;
 
-    // ========= PVP =========
-    private static final List<String> PVP_WEAPONS = List.of(
-            "v was erased by k's w.",
-            "k emotionally ruined v using w.",
-            "k speedran v's life.",
-            "v lost their entire career to k."
-    );
+    // Path to JSON config
+    private static final Path CONFIG_PATH = Path.of("config", "MastaConfig", "DeathMessages.json");
 
-    private static final List<String> PVP_FISTS = List.of(
-            "v got deleted by k's hands.",
-            "k chose violence against v.",
-            "v caught hands from k."
-    );
+    /**
+     * Load the JSON config. Auto-creates file with default messages if missing.
+     */
+    public static void loadConfig() {
+        try {
+            File file = CONFIG_PATH.toFile();
+            if (!file.exists()) {
+                file.getParentFile().mkdirs(); // Create MastaConfig folder if missing
+                try (FileWriter writer = new FileWriter(file)) {
+                    Gson gson = new GsonBuilder().setPrettyPrinting().create();
+                    gson.toJson(getDefaultMessages(), writer); // Write default messages
+                }
+            }
+            try (FileReader reader = new FileReader(file)) {
+                Type type = new TypeToken<Map<String, List<String>>>() {}.getType();
+                messages = new Gson().fromJson(reader, type);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
-    // ========= MOB =========
-    private static final List<String> MOB_KILLS = List.of(
-            "v was claimed by m.",
-            "m ended v.",
-            "v underestimated m.",
-            "m introduced v to death."
-    );
+    /**
+     * Default death messages. Used if JSON config is missing.
+     * ## Note: Placeholders you can use:
+     * {player} - the victim
+     * {killer} - the player killing
+     * {weapon} - weapon used by killer or mob
+     * {mob} - mob that killed the player
+     */
+    private static Map<String, List<String>> getDefaultMessages() {
+        Map<String, List<String>> defaults = new HashMap<>();
+        defaults.put("pvpWeapons", List.of(
+                "§b{player} was erased by {killer}'s {weapon}.",
+                "§b{killer} emotionally ruined {player} using {weapon}.",
+                "§b{killer} speedran {player}'s life.",
+                "§b{player} lost their entire career to {killer}."
+        ));
+        defaults.put("pvpFists", List.of(
+                "§b{player} got deleted by {killer}'s hands.",
+                "§b{killer} chose violence against {player}.",
+                "§b{player} caught hands from {killer}."
+        ));
+        defaults.put("mobKills", List.of(
+                "§b{player} was claimed by {mob}'s {weapon}.",
+                "§b{mob} ended {player} using {weapon}.",
+                "§b{player} underestimated {mob}'s {weapon}.",
+                "§b{mob} introduced {player} to death with {weapon}."
+        ));
+        defaults.put("fall", List.of(
+                "§b{player} challenged gravity and lost.",
+                "§b{player} fell with confidence.",
+                "§b{player} invented gravity testing.",
+                "§b{player} lost the ground.",
+                "§b{player} believed in flight too much."
+        ));
+        defaults.put("fire", List.of(
+                "§b{player} developed a toxic relationship with fire.",
+                "§b{player} became ambience.",
+                "§b{player} burned with purpose."
+        ));
+        defaults.put("lava", List.of(
+                "§b{player} tried to swim in soup.",
+                "§b{player} became lava décor.",
+                "§b{player} flavored the magma."
+        ));
+        defaults.put("explode", List.of(
+                "§b{player} was violently rearranged.",
+                "§b{player} became abstract.",
+                "§b{player} stood too close to emotion."
+        ));
+        defaults.put("drown", List.of(
+                "§b{player} forgot breathing.",
+                "§b{player} tried liquid oxygen."
+        ));
+        defaults.put("void", List.of(
+                "§b{player} left reality.",
+                "§b{player} wandered too far."
+        ));
+        defaults.put("magic", List.of(
+                "§b{player} trusted magic incorrectly.",
+                "§b{player} exploded spiritually."
+        ));
+        defaults.put("suffocate", List.of(
+                "§b{player} hugged a wall too hard.",
+                "§b{player} clipped into regret."
+        ));
+        defaults.put("generic", List.of(
+                "§b{player} experienced consequences.",
+                "§b{player} made a bad choice.",
+                "§b{player} lost to physics."
+        ));
+        return defaults;
+    }
 
-    // ========= ENVIRONMENT =========
-    private static final List<String> FALL = List.of(
-            "v challenged gravity and lost.",
-            "v fell with confidence.",
-            "v invented gravity testing.",
-            "v lost the ground.",
-            "v believed in flight too much."
-    );
-
-    private static final List<String> FIRE = List.of(
-            "v developed a toxic relationship with fire.",
-            "v became ambience.",
-            "v burned with purpose."
-    );
-
-    private static final List<String> LAVA = List.of(
-            "v tried to swim in soup.",
-            "v became lava décor.",
-            "v flavored the magma."
-    );
-
-    private static final List<String> EXPLODE = List.of(
-            "v was violently rearranged.",
-            "v became abstract.",
-            "v stood too close to emotion."
-    );
-
-    private static final List<String> DROWN = List.of(
-            "v forgot breathing.",
-            "v tried liquid oxygen."
-    );
-
-    private static final List<String> VOID = List.of(
-            "v left reality.",
-            "v wandered too far."
-    );
-
-    private static final List<String> MAGIC = List.of(
-            "v trusted magic incorrectly.",
-            "v exploded spiritually."
-    );
-
-    private static final List<String> SUFFOCATE = List.of(
-            "v hugged a wall too hard.",
-            "v clipped into regret."
-    );
-
-    private static final List<String> GENERIC = List.of(
-            "v experienced consequences.",
-            "v made a bad choice.",
-            "v lost to physics."
-    );
-
-    // ========= EVENT =========
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent event) {
+        if (messages == null) loadConfig(); // Auto-load if not loaded
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         DamageSource source = event.getSource();
@@ -104,67 +140,66 @@ public class DeathMessages {
 
         Entity attacker = source.getEntity();
 
-        // ---- PVP ----
+        // PVP death
         if (attacker instanceof Player killer) {
             String k = killer.getName().getString();
-            String weapon = killer.getMainHandItem().isEmpty()
-                    ? "fists"
-                    : killer.getMainHandItem().getHoverName().getString();
 
-            List<String> pool = weapon.equals("fists") ? PVP_FISTS : PVP_WEAPONS;
-            message = pick(pool)
-                    .replace("v", victim)
-                    .replace("k", k)
-                    .replace("w", weapon);
+            ItemStack weaponStack = killer.getMainHandItem();
+            if (weaponStack.isEmpty() || weaponStack.getItem() == Items.AIR) {
+                // Empty hand = fists
+                List<String> pool = messages.get("pvpFists");
+                message = pick(pool)
+                        .replace("{player}", victim)
+                        .replace("{killer}", k);
+            } else {
+                // Use weapon display name
+                String weapon = weaponStack.getHoverName().getString();
+                List<String> pool = messages.get("pvpWeapons");
+                message = pick(pool)
+                        .replace("{player}", victim)
+                        .replace("{killer}", k)
+                        .replace("{weapon}", weapon);
+            }
 
-            // ---- MOB ----
+            // Mob death
         } else if (attacker instanceof LivingEntity mob) {
             String m = mob.getName().getString();
-            message = pick(MOB_KILLS)
-                    .replace("v", victim)
-                    .replace("m", m);
 
-            // ---- ENVIRONMENT ----
-            // FALL
-        } else if (source == DamageSource.FALL) {
-            message = pick(FALL).replace("v", victim);
+            String weapon = "claws"; // default
+            ItemStack weaponStack = mob.getMainHandItem();
+            if (!weaponStack.isEmpty() && weaponStack.getItem() != Items.AIR) {
+                weapon = weaponStack.getHoverName().getString();
+            }
 
-// FIRE
-        } else if (source == DamageSource.ON_FIRE || source == DamageSource.IN_FIRE) {
-            message = pick(FIRE).replace("v", victim);
+            List<String> pool = messages.get("mobKills");
+            message = pick(pool)
+                    .replace("{player}", victim)
+                    .replace("{mob}", m)
+                    .replace("{weapon}", weapon);
 
-// LAVA
-        } else if (source == DamageSource.LAVA) {
-            message = pick(LAVA).replace("v", victim);
-
-// EXPLOSION
-        } else if (source.isExplosion()) { // isExplosion() still exists
-            message = pick(EXPLODE).replace("v", victim);
-
-// DROWN
-        } else if (source == DamageSource.DROWN) {
-            message = pick(DROWN).replace("v", victim);
-
-// VOID
-        } else if (source == DamageSource.OUT_OF_WORLD) {
-            message = pick(VOID).replace("v", victim);
-
-// MAGIC
-        } else if (source == DamageSource.MAGIC) {
-            message = pick(MAGIC).replace("v", victim);
-
-// SUFFOCATE / IN_WALL
-        } else if (source == DamageSource.IN_WALL) {
-            message = pick(SUFFOCATE).replace("v", victim);
+            // Environment / other deaths
+        } else {
+            String type = source.getMsgId();
+            switch (type) {
+                case "fall" -> message = pick(messages.get("fall")).replace("{player}", victim);
+                case "inFire", "onFire" -> message = pick(messages.get("fire")).replace("{player}", victim);
+                case "lava" -> message = pick(messages.get("lava")).replace("{player}", victim);
+                case "explosion", "explosion.player", "explosion.mob" -> message = pick(messages.get("explode")).replace("{player}", victim);
+                case "drown" -> message = pick(messages.get("drown")).replace("{player}", victim);
+                case "outOfWorld" -> message = pick(messages.get("void")).replace("{player}", victim);
+                case "magic" -> message = pick(messages.get("magic")).replace("{player}", victim);
+                case "inWall" -> message = pick(messages.get("suffocate")).replace("{player}", victim);
+                default -> message = pick(messages.get("generic")).replace("{player}", victim);
+            }
         }
 
-        // Override vanilla death message
+        // Broadcast custom death message
         event.setCanceled(true);
-        player.getServer().getPlayerList()
-                .broadcastSystemMessage(Component.literal(message), false);
+        player.getServer().getPlayerList().broadcastSystemMessage(Component.literal(message), false);
     }
 
     private static String pick(List<String> list) {
+        if (list == null || list.isEmpty()) return "{player} met an untimely fate.";
         return list.get(RANDOM.nextInt(list.size()));
     }
 }
