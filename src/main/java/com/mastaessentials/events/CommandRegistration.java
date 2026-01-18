@@ -11,6 +11,7 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import com.mastaessentials.chat.ChatManager;
+import net.minecraftforge.event.server.ServerStartedEvent;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 
@@ -26,16 +27,17 @@ public class CommandRegistration {
         RankCommand.register(event.getDispatcher());
         ReloadCommand.register(event.getDispatcher());
         AfkManager.register(event.getDispatcher());
-        TpaManager.registerCommands(event.getDispatcher()); // register /tpa commands
+        TpaManager.registerCommands(event.getDispatcher());
         ChatManager.registerCommands(event.getDispatcher());
     }
 
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
-        HomeCommand.loadHomes(event.getServer());
+        HomeCommand.loadHomes(event.getServer()); // server exists here
         RankCommand.loadConfig(event.getServer());
         AfkManager.loadConfig();
-        TpaManager.loadConfig(); // <--- this creates the JSON if it doesn't exist
+        TpaManager.loadConfig();
         ChatManager.loadConfig();
     }
+
 }

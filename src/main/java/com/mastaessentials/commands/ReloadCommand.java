@@ -27,7 +27,6 @@ public class ReloadCommand {
 
         if (server != null) {
             // Reload Home config
-            HomeCommand.loadConfig();
             HomeCommand.loadHomes(server);
 
             // Reload Rank config
