@@ -75,7 +75,7 @@ public class MastaEssentialsMod {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
-        LOGGER.info("RankCommand, HomeCommand are starting!");
+        LOGGER.info("RankCommand, HomeCommand, WarpCommand are starting!");
 
         // Load homes JSON on server start
         HomeCommand.loadHomes(event.getServer());

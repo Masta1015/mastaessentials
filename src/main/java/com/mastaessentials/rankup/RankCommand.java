@@ -103,19 +103,19 @@ public class RankCommand {
                     "• /trash",
                     "• 1 Donor Crate Key on get"
             )));
-            ranks.add("Runesmith", rankObj(25, 0, List.of("give %player% minecraft:diamond 2"), List.of(
+            ranks.add("Runesmith", rankObj(51, 0, List.of("give %player% minecraft:diamond 2"), List.of(
+                    "• 1 /pwarp create",
                     "• 1 /sethome",
                     "• 4 chunks",
                     "• 1 Donor Crate Key on get"
             )));
-            ranks.add("Arcanengineer", rankObj(61, 0, List.of(), List.of(
-                    "• 1 /pwarp create",
+            ranks.add("Arcanengineer", rankObj(101, 0, List.of(), List.of(
                     "• 1 /sethome",
                     "• 4 chunks",
                     "• /nick",
                     "• 1 Donor Crate Key on get"
             )));
-            ranks.add("Mystic Mechanist", rankObj(100, 0, List.of(), List.of(
+            ranks.add("Mystic Mechanist", rankObj(201, 0, List.of(), List.of(
                     "• 1 /pwarp create",
                     "• 1 /sethome",
                     "• 4 chunks",
