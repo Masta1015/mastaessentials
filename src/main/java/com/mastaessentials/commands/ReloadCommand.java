@@ -1,7 +1,5 @@
 package com.mastaessentials.commands;
 
-import com.mastaessentials.MastaEssentialsMod;
-import com.mastaessentials.commands.HomeCommand;
 import com.mastaessentials.rankup.RankCommand;
 import com.mastaessentials.afk.AfkManager;
 import com.mastaessentials.JoinandLeave.JoinLeaveMessages;
@@ -17,7 +15,7 @@ import com.mastaessentials.chat.ChatManager;
 public class ReloadCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("reloadmod")
+        dispatcher.register(Commands.literal("reloadconfig")
                 .requires(cs -> cs.hasPermission(2))
                 .executes(context -> reload(context.getSource())));
     }
@@ -45,8 +43,6 @@ public class ReloadCommand {
             TpaManager.loadConfig(); // <-- This will reload Tpa.json
             ChatManager.loadConfig();
         }
-
-        MastaEssentialsMod.reloadConfigs();
 
         source.sendSuccess(
                 () -> Component.literal("MastaEssentials configs reloaded successfully!"),
