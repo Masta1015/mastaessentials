@@ -101,7 +101,6 @@ public class MastaEssentialsMod {
 
         // ✅ NOW this will actually run
         SchedulerConfig.load();
-        TimeScheduler.setServer(event.getServer());
 
         // ✅ Scheduler will tick
         MinecraftForge.EVENT_BUS.register(new TimeScheduler());
