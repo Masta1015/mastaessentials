@@ -5,33 +5,21 @@ import net.minecraft.commands.CommandSourceStack;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.level.GameRules;
 import net.minecraftforge.common.MinecraftForge;
+
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.server.ServerLifecycleHooks;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 
-/**
- * TimeScheduler
- *
- * Executes commands at scheduled times based on:
- * 1. Real-world time (system/server clock)
- * 2. Minecraft world time (ticks)
- *
- * Config example in Scheduler.toml:
- *
- * enabled = true
- * tasks_real = ["08:20|say Hello Real World", "12:00|say Noon Real World"]
- * tasks_minecraft = ["6000|say Good morning Minecraft", "18000|say Good evening Minecraft"]
- */
 public class TimeScheduler {
 
-    private String lastExecutedReal = "";
-    private long lastExecutedMinecraft = -1;
+    private String lastMinecraftTask = "";
+    private LocalTime lastRealTimeTask = null;
 
     public TimeScheduler() {
         MinecraftForge.EVENT_BUS.register(this);
@@ -39,93 +27,73 @@ public class TimeScheduler {
 
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
-        if (!SchedulerConfig.enabled()) return;
-
-        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        MinecraftServer server = event.getServer();
         if (server == null) return;
 
-        checkRealWorldTime(server);
-        checkMinecraftWorldTime(server);
+        handleMinecraftTasks(server);
+        handleRealWorldTasks(server);
     }
 
-    // ---------------------------
-    // Real-world time scheduler
-    // ---------------------------
-    private void checkRealWorldTime(MinecraftServer server) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
-        LocalTime now = LocalTime.now();
-        String nowStr = now.format(formatter);
+    private void handleMinecraftTasks(MinecraftServer server) {
+        if (!SchedulerConfig.enabled()) return;
 
-        List<String> tasks = SchedulerConfig.tasksReal();
-        if (tasks == null) return;
-
-        for (String task : tasks) {
+        for (String task : SchedulerConfig.tasksMinecraft()) {
             String[] parts = task.split("\\|", 2);
             if (parts.length != 2) continue;
 
-            String timeStr = parts[0];
+            String tickStr = parts[0];
             String command = parts[1];
 
-            // Parse task time
-            LocalTime taskTime;
             try {
-                taskTime = LocalTime.parse(timeStr, formatter);
-            } catch (Exception e) {
-                server.getPlayerList().broadcastSystemMessage(
-                        Component.literal("[Scheduler] Invalid time format in task: " + task),
-                        false
-                );
-                continue;
-            }
+                int tick = Integer.parseInt(tickStr);
+                int worldTime = (int) (server.overworld().getDayTime() % 24000);
 
-            // Execute if within the minute and not already executed
-            if (!lastExecutedReal.equals(timeStr) &&
-                    !now.isBefore(taskTime) &&
-                    now.isBefore(taskTime.plusMinutes(1))) {
-
-                executeCommand(server, command, "[Scheduler][RealTime]");
-                lastExecutedReal = timeStr;
-            }
-        }
-    }
-
-    // ---------------------------
-    // Minecraft world time scheduler
-    // ---------------------------
-    private void checkMinecraftWorldTime(MinecraftServer server) {
-        long worldTime = server.overworld().getDayTime() % 24000; // Minecraft ticks
-        List<String> tasks = SchedulerConfig.tasksMinecraft();
-        if (tasks == null) return;
-
-        for (String task : tasks) {
-            String[] parts = task.split("\\|", 2);
-            if (parts.length != 2) continue;
-
-            long targetTick;
-            try {
-                targetTick = Long.parseLong(parts[0]);
+                if (worldTime == tick && !lastMinecraftTask.equals(task)) {
+                    executeCommand(server, command);
+                    lastMinecraftTask = task;
+                }
             } catch (NumberFormatException e) {
                 server.getPlayerList().broadcastSystemMessage(
-                        Component.literal("[Scheduler] Invalid Minecraft tick in task: " + task),
+                        Component.literal("[Scheduler] Invalid Minecraft tick: " + tickStr),
                         false
                 );
-                continue;
-            }
-
-            String command = parts[1];
-
-            // Execute if we just reached this tick and haven't executed yet
-            if (worldTime == targetTick && lastExecutedMinecraft != targetTick) {
-                executeCommand(server, command, "[Scheduler][MCWorld]");
-                lastExecutedMinecraft = targetTick;
             }
         }
     }
 
-    // ---------------------------
-    // Command execution helper
-    // ---------------------------
-    private void executeCommand(MinecraftServer server, String command, String prefix) {
+    private void handleRealWorldTasks(MinecraftServer server) {
+        if (!SchedulerConfig.enabled()) return;
+
+        // Use CST explicitly
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("America/Chicago"));
+
+        for (String task : SchedulerConfig.tasksReal()) {
+            String[] parts = task.split("\\|", 2);
+            if (parts.length != 2) continue;
+
+            String timeStr = parts[0]; // "HH:mm"
+            String command = parts[1];
+
+            try {
+                LocalTime taskTime = LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("HH:mm"));
+
+                // Execute if it's this minute and hasn't executed yet
+                if ((lastRealTimeTask == null || !lastRealTimeTask.equals(taskTime))
+                        && now.getHour() == taskTime.getHour()
+                        && now.getMinute() == taskTime.getMinute()) {
+                    executeCommand(server, command);
+                    lastRealTimeTask = taskTime;
+                }
+            } catch (Exception e) {
+                server.getPlayerList().broadcastSystemMessage(
+                        Component.literal("[Scheduler] Invalid real-world time: " + timeStr),
+                        false
+                );
+            }
+        }
+    }
+
+    private void executeCommand(MinecraftServer server, String command) {
         CommandSourceStack source = server.createCommandSourceStack().withPermission(4);
 
         try {
@@ -133,14 +101,14 @@ public class TimeScheduler {
         } catch (CommandSyntaxException e) {
             e.printStackTrace();
             server.getPlayerList().broadcastSystemMessage(
-                    Component.literal(prefix + " Failed to execute command: " + command),
+                    Component.literal("[Scheduler] Failed to execute command: " + command),
                     false
             );
             return;
         }
 
         server.getPlayerList().broadcastSystemMessage(
-                Component.literal(prefix + " Executed: " + command),
+                Component.literal("[Scheduler] Executed: " + command),
                 false
         );
     }
