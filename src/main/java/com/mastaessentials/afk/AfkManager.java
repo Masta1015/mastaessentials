@@ -12,6 +12,7 @@ import net.minecraftforge.event.ServerChatEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.TickEvent.ServerTickEvent;
 import net.minecraftforge.event.TickEvent.PlayerTickEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -88,7 +89,6 @@ public class AfkManager {
         UUID uuid = player.getUUID();
         lastActive.put(uuid, System.currentTimeMillis());
         if (afkPlayers.remove(uuid)) {
-            // Send "no longer AFK" message
             String msg = getMessage("afkDisabled").replace("%player%", player.getName().getString());
             player.sendSystemMessage(Component.literal(msg));
         }
@@ -99,8 +99,8 @@ public class AfkManager {
     public static void onPlayerTick(PlayerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         if (!(event.player instanceof ServerPlayer)) return;
-        ServerPlayer player = (ServerPlayer) event.player;
 
+        ServerPlayer player = (ServerPlayer) event.player;
         Position lastPos = playerPositions.getOrDefault(player.getUUID(),
                 new Position(player.getX(), player.getY(), player.getZ()));
 
@@ -114,8 +114,7 @@ public class AfkManager {
     @SubscribeEvent
     public static void onPlayerChat(ServerChatEvent event) {
         if (!(event.getPlayer() instanceof ServerPlayer)) return;
-        ServerPlayer player = (ServerPlayer) event.getPlayer();
-        playerActivity(player);
+        playerActivity((ServerPlayer) event.getPlayer());
     }
 
     @SubscribeEvent
@@ -128,7 +127,8 @@ public class AfkManager {
 
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             UUID uuid = player.getUUID();
-            lastActive.putIfAbsent(uuid, now);
+            lastActive.putIfAbsent(uuid, now); // safety
+
             long last = lastActive.get(uuid);
 
             // Automatic AFK after idle time
@@ -151,7 +151,19 @@ public class AfkManager {
         }
     }
 
-    // -------------------- Config --------------------
+    // -------------------- Player Login/Logout --------------------
+    @SubscribeEvent
+    public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer)) return;
+
+        ServerPlayer player = (ServerPlayer) event.getEntity();
+        UUID uuid = player.getUUID();
+
+        lastActive.put(uuid, System.currentTimeMillis());
+        playerPositions.put(uuid, new Position(player.getX(), player.getY(), player.getZ()));
+        afkPlayers.remove(uuid);
+    }
+
     @SubscribeEvent
     public static void onServerStarted(ServerStartedEvent e) {
         loadConfig();
@@ -164,6 +176,7 @@ public class AfkManager {
         playerPositions.clear();
     }
 
+    // -------------------- Config --------------------
     public static void loadConfig() {
         try {
             Files.createDirectories(CONFIG_FILE.getParent());
