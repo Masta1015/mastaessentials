@@ -7,7 +7,7 @@ license="MIT"
 modId="mastaessentials"
 version="1.0.0"
 displayName="Masta Essentials"
-description='''A Minecraft mod that allows more homes and other utilities.'''
+description="A Minecraft mod that allows more homes and other utilities."
 authors="Masta2222"
 
 # Dependencies for the mod

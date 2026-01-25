@@ -4,22 +4,28 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.network.chat.Component;
-import net.luckperms.api.LuckPerms;
-import net.luckperms.api.LuckPermsProvider;
-import net.luckperms.api.model.user.User;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.TickEvent.ServerTickEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
+import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.fml.loading.FMLPaths;
+import net.luckperms.api.LuckPerms;
+import net.luckperms.api.LuckPermsProvider;
+import net.luckperms.api.model.user.User;
+
+import com.mojang.brigadier.context.CommandContext;
+import net.minecraftforge.event.RegisterCommandsEvent;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -28,6 +34,7 @@ import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 @Mod.EventBusSubscriber
 public class HomeCommand {
@@ -49,13 +56,13 @@ public class HomeCommand {
     // -------------------- Command Registration --------------------
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
 
+        // SET HOME
         dispatcher.register(
                 Commands.literal("sethome")
                         .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(context -> {
-                                    ServerPlayer player = context.getSource().getPlayerOrException();
-                                    String homeName = capitalize(StringArgumentType.getString(context, "name"));
-
+                                .executes(ctx -> {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    String homeName = capitalize(StringArgumentType.getString(ctx, "name"));
                                     int maxHomes = getMaxHomes(player);
                                     Map<String, HomePosition> playerHomes = homes.computeIfAbsent(player.getUUID(), k -> new HashMap<>());
 
@@ -77,103 +84,34 @@ public class HomeCommand {
                         )
         );
 
+        // LIST HOMES
         dispatcher.register(
                 Commands.literal("homes")
                         .executes(ctx -> listHomes(ctx.getSource().getPlayerOrException()))
         );
 
+        // DELETE HOME
         dispatcher.register(
                 Commands.literal("delhome")
                         .then(Commands.argument("name", StringArgumentType.word())
-                                .suggests((ctx, builder) -> {
-                                    ServerPlayer p = ctx.getSource().getPlayer();
-                                    if (p != null && homes.containsKey(p.getUUID())) {
-                                        homes.get(p.getUUID()).keySet().forEach(builder::suggest);
-                                    }
-                                    return builder.buildFuture();
-                                })
-                                .executes(context -> {
-                                    ServerPlayer player = context.getSource().getPlayerOrException();
-                                    String input = StringArgumentType.getString(context, "name");
-                                    String homeName = findHomeIgnoreCase(player, input);
-
-                                    if (homeName == null) {
-                                        player.sendSystemMessage(Component.literal(
-                                                MESSAGES.getOrDefault("notexist", "Home '%home%' does not exist!")
-                                                        .replace("%home%", input)
-                                        ));
-                                        return 0;
-                                    }
-
-                                    homes.get(player.getUUID()).remove(homeName);
-                                    saveHomes(player);
-                                    player.sendSystemMessage(Component.literal(
-                                            MESSAGES.getOrDefault("deleted", "Home '%home%' deleted!").replace("%home%", homeName)
-                                    ));
-                                    return 1;
-                                })
+                                .suggests(HomeCommand::suggestHomes)
+                                .executes(ctx -> deleteHome(ctx.getSource().getPlayerOrException(), StringArgumentType.getString(ctx, "name")))
                         )
         );
 
+        // TELEPORT HOME
         dispatcher.register(
                 Commands.literal("home")
                         .then(Commands.argument("name", StringArgumentType.word())
-                                .suggests((ctx, builder) -> {
-                                    ServerPlayer p = ctx.getSource().getPlayer();
-                                    if (p != null && homes.containsKey(p.getUUID())) {
-                                        homes.get(p.getUUID()).keySet().forEach(builder::suggest);
-                                    }
-                                    return builder.buildFuture();
-                                })
-                                .executes(context -> {
-                                    ServerPlayer player = context.getSource().getPlayerOrException();
-                                    String input = StringArgumentType.getString(context, "name");
-                                    String homeName = findHomeIgnoreCase(player, input);
-
-                                    if (homeName == null) {
-                                        player.sendSystemMessage(Component.literal(
-                                                MESSAGES.getOrDefault("notexist", "Home '%home%' does not exist!").replace("%home%", input)
-                                        ));
-                                        return 0;
-                                    }
-
-                                    HomePosition pos = homes.get(player.getUUID()).get(homeName);
-
-                                    if (!HOMES_FEATURE_ENABLED) {
-                                        player.sendSystemMessage(Component.literal(
-                                                MESSAGES.getOrDefault("disabled", "Homes are currently disabled.")
-                                        ));
-                                        return 0;
-                                    }
-
-                                    long now = System.currentTimeMillis();
-                                    long last = lastTeleport.getOrDefault(player.getUUID(), 0L);
-                                    if (now - last < COOLDOWN) {
-                                        player.sendSystemMessage(Component.literal(
-                                                MESSAGES.getOrDefault("cooldown", "You must wait before teleporting again.")
-                                        ));
-                                        return 0;
-                                    }
-
-                                    // Dynamically use WARMUP seconds in message
-                                    player.sendSystemMessage(Component.literal(
-                                            MESSAGES.getOrDefault("teleporting", "Teleporting to home '%home%' in %time% seconds...")
-                                                    .replace("%home%", homeName)
-                                                    .replace("%time%", String.valueOf(WARMUP / 1000))
-                                    ));
-
-                                    scheduledTeleports.put(
-                                            player.getUUID(),
-                                            new ScheduledTeleport(player, pos, (int)(WARMUP / 50))
-                                    );
-                                    return 1;
-                                })
+                                .suggests(HomeCommand::suggestHomes)
+                                .executes(ctx -> teleportHome(ctx.getSource().getPlayerOrException(), StringArgumentType.getString(ctx, "name")))
                         )
         );
 
+        // LIST HOMES ALIAS
         dispatcher.register(
                 Commands.literal("listhomes")
-                        .executes(context -> listHomes(context.getSource().getPlayerOrException()))
+                        .executes(ctx -> listHomes(ctx.getSource().getPlayerOrException()))
         );
     }
 
@@ -219,6 +157,83 @@ public class HomeCommand {
         return null;
     }
 
+    // -------------------- Teleport --------------------
+    private static int teleportHome(ServerPlayer player, String input) {
+        String homeName = findHomeIgnoreCase(player, input);
+        if (homeName == null) {
+            player.sendSystemMessage(Component.literal(
+                    MESSAGES.getOrDefault("notexist", "Home '%home%' does not exist!").replace("%home%", input)
+            ));
+            return 0;
+        }
+
+        HomePosition pos = homes.get(player.getUUID()).get(homeName);
+
+        if (!HOMES_FEATURE_ENABLED) {
+            player.sendSystemMessage(Component.literal(MESSAGES.getOrDefault("disabled", "Homes are currently disabled.")));
+            return 0;
+        }
+
+        long now = System.currentTimeMillis();
+        long last = lastTeleport.getOrDefault(player.getUUID(), 0L);
+        if (now - last < COOLDOWN) {
+            player.sendSystemMessage(Component.literal(MESSAGES.getOrDefault("cooldown", "You must wait before teleporting again.")));
+            return 0;
+        }
+
+        player.sendSystemMessage(Component.literal(
+                MESSAGES.getOrDefault("teleporting", "Teleporting to home '%home%' in %time% seconds...")
+                        .replace("%home%", homeName)
+                        .replace("%time%", String.valueOf(WARMUP / 1000))
+        ));
+
+        scheduledTeleports.put(player.getUUID(), new ScheduledTeleport(player, pos, (int)(WARMUP / 50)));
+        return 1;
+    }
+
+    private static int deleteHome(ServerPlayer player, String input) {
+        String homeName = findHomeIgnoreCase(player, input);
+        if (homeName == null) {
+            player.sendSystemMessage(Component.literal(
+                    MESSAGES.getOrDefault("notexist", "Home '%home%' does not exist!").replace("%home%", input)
+            ));
+            return 0;
+        }
+
+        homes.get(player.getUUID()).remove(homeName);
+        saveHomes(player);
+        player.sendSystemMessage(Component.literal(
+                MESSAGES.getOrDefault("deleted", "Home '%home%' deleted!").replace("%home%", homeName)
+        ));
+        return 1;
+    }
+
+    // -------------------- Tab Completion --------------------
+    private static CompletableFuture<Suggestions> suggestHomes(
+            CommandContext<CommandSourceStack> ctx,
+            SuggestionsBuilder builder
+    ) {
+        ServerPlayer player;
+        try {
+            player = ctx.getSource().getPlayerOrException();
+        } catch (Exception e) {
+            return builder.buildFuture();
+        }
+
+        Map<String, HomePosition> playerHomes = homes.get(player.getUUID());
+        if (playerHomes == null) return builder.buildFuture();
+
+        String remaining = builder.getRemainingLowerCase();
+
+        for (String name : playerHomes.keySet()) {
+            if (name.toLowerCase(Locale.ROOT).startsWith(remaining)) {
+                builder.suggest(name);
+            }
+        }
+
+        return builder.buildFuture();
+    }
+
     // -------------------- Events --------------------
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent event) {
@@ -239,7 +254,6 @@ public class HomeCommand {
             }
         }
     }
-
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent e) {
         saveHomes(null);
@@ -253,14 +267,9 @@ public class HomeCommand {
 
     // -------------------- JSON --------------------
     private static void ensureDir(Path file) {
-        try {
-            Files.createDirectories(file.getParent());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        try { Files.createDirectories(file.getParent()); } catch (IOException ignored) {}
     }
 
-    // -------------------- Home Storage --------------------
     public static void saveHomes(ServerPlayer player) {
         ensureDir(HOMES_FILE);
         try (Writer w = Files.newBufferedWriter(HOMES_FILE)) {
@@ -275,9 +284,7 @@ public class HomeCommand {
                 out.put(uuid, homesList);
             }
             GSON.toJson(out, w);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
     public static void loadHomes(MinecraftServer server) {
@@ -294,15 +301,16 @@ public class HomeCommand {
                 for (SerializableHome sh : entry.getValue()) {
                     ServerLevel level = getLevelByName(sh.level, server);
                     if (level != null) {
-                        playerHomes.put(sh.homeName, new HomePosition(sh.x, sh.y, sh.z, level, sh.homeName));
+                        playerHomes.put(sh.homeName, new HomePosition(
+                                sh.x, sh.y, sh.z, level, 0f, 0f, sh.homeName
+                        ));
+
                     }
                 }
                 homes.put(entry.getKey(), playerHomes);
             }
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
     private static ServerLevel getLevelByName(String name, MinecraftServer server) {
@@ -320,13 +328,11 @@ public class HomeCommand {
         String name;
 
         HomePosition(ServerPlayer p, String name) {
-            this(p.getX(), p.getY(), p.getZ(), (ServerLevel)p.level(), name);
-            this.yRot = p.getYRot();
-            this.xRot = p.getXRot();
+            this(p.getX(), p.getY(), p.getZ(), (ServerLevel)p.level(), p.getYRot(), p.getXRot(), name);
         }
 
-        HomePosition(double x, double y, double z, ServerLevel level, String name) {
-            this.x=x; this.y=y; this.z=z; this.level=level; this.name=name;
+        HomePosition(double x, double y, double z, ServerLevel level, float yRot, float xRot, String name) {
+            this.x=x; this.y=y; this.z=z; this.level=level; this.yRot=yRot; this.xRot=xRot; this.name=name;
         }
     }
 
@@ -337,8 +343,10 @@ public class HomeCommand {
         int ticksLeft;
 
         ScheduledTeleport(ServerPlayer p, HomePosition pos, int ticks) {
-            this.player=p; this.pos=pos; this.ticksLeft=ticks;
-            this.startX=p.getX(); this.startY=p.getY(); this.startZ=p.getZ();
+            this.player = p;
+            this.pos = pos;
+            this.ticksLeft = ticks;
+            this.startX = p.getX(); this.startY = p.getY(); this.startZ = p.getZ();
         }
     }
 
@@ -351,10 +359,7 @@ public class HomeCommand {
         SerializableHome(String playerName, String homeName, double x, double y, double z, String level) {
             this.playerName = playerName;
             this.homeName = homeName;
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.level = level;
+            this.x = x; this.y = y; this.z = z; this.level = level;
         }
 
         static SerializableHome from(HomePosition p, String playerName) {
@@ -362,12 +367,10 @@ public class HomeCommand {
         }
     }
 
-    // -------------------- Home Config --------------------
+    // -------------------- Config --------------------
     public static void loadConfig() {
         ensureDir(CONFIG_FILE);
-        if (!Files.exists(CONFIG_FILE)) {
-            saveDefaultConfig();
-        }
+        if (!Files.exists(CONFIG_FILE)) saveDefaultConfig();
 
         try (Reader r = Files.newBufferedReader(CONFIG_FILE)) {
             Map<String, Object> cfg = GSON.fromJson(r, Map.class);
@@ -375,13 +378,10 @@ public class HomeCommand {
             WARMUP = (long)(((Double) cfg.getOrDefault("warmup", 10.0)) * 1000);
             COOLDOWN = (long)(((Double) cfg.getOrDefault("cooldown", 10.0)) * 1000);
 
-            // Load messages
             Map<String, String> msgs = (Map<String, String>) cfg.get("messages");
             if (msgs != null) MESSAGES = msgs;
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
     public static void saveDefaultConfig() {
@@ -402,11 +402,9 @@ public class HomeCommand {
             messages.put("cooldown", "§cYou must wait before teleporting again.");
             messages.put("disabled", "§cHomes are currently disabled.");
             messages.put("nohomes", "§cYou have no homes set.");
-
             cfg.put("messages", messages);
-            GSON.toJson(cfg, w); // pretty printed
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+
+            GSON.toJson(cfg, w);
+        } catch (Exception e) { e.printStackTrace(); }
     }
 }

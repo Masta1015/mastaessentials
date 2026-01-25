@@ -1,4 +1,4 @@
-package com.mastaessentials.config;
+package com.mastaessentials.MastaEssentialsMod;
 
 import com.mastaessentials.commands.HomeCommand;
 import com.mastaessentials.commands.ReloadCommand;

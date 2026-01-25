@@ -33,7 +33,7 @@ public class CommandRegistration {
 
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
-        HomeCommand.loadHomes(event.getServer()); // server exists here
+        HomeCommand.loadHomes(event.getServer());
         RankCommand.loadConfig(event.getServer());
         AfkManager.loadConfig();
         TpaManager.loadConfig();
