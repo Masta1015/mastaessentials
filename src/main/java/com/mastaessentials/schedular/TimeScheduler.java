@@ -99,17 +99,10 @@ public class TimeScheduler {
         try {
             server.getCommands().getDispatcher().execute(command, source);
         } catch (CommandSyntaxException e) {
-            e.printStackTrace();
-            server.getPlayerList().broadcastSystemMessage(
-                    Component.literal("[Scheduler] Failed to execute command: " + command),
-                    false
-            );
-            return;
+            e.printStackTrace(); // optional: prints error to console
+            // removed broadcast of failure message
         }
 
-        server.getPlayerList().broadcastSystemMessage(
-                Component.literal("[Scheduler] Executed: " + command),
-                false
-        );
+        // removed broadcast of success message
     }
 }

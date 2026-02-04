@@ -15,6 +15,8 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
+
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -131,7 +133,7 @@ public class DeathMessages {
 
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent event) {
-        if (messages == null) loadConfig(); // Auto-load if not loaded
+        if (messages == null) loadConfig();
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         DamageSource source = event.getSource();
@@ -140,62 +142,40 @@ public class DeathMessages {
 
         Entity attacker = source.getEntity();
 
-        // PVP death
         if (attacker instanceof Player killer) {
             String k = killer.getName().getString();
-
             ItemStack weaponStack = killer.getMainHandItem();
+
             if (weaponStack.isEmpty() || weaponStack.getItem() == Items.AIR) {
-                // Empty hand = fists
-                List<String> pool = messages.get("pvpFists");
-                message = pick(pool)
+                message = pick(messages.get("pvpFists"))
                         .replace("{player}", victim)
                         .replace("{killer}", k);
             } else {
-                // Use weapon display name
-                String weapon = weaponStack.getHoverName().getString();
-                List<String> pool = messages.get("pvpWeapons");
-                message = pick(pool)
+                message = pick(messages.get("pvpWeapons"))
                         .replace("{player}", victim)
                         .replace("{killer}", k)
-                        .replace("{weapon}", weapon);
+                        .replace("{weapon}", weaponStack.getHoverName().getString());
             }
 
-            // Mob death
         } else if (attacker instanceof LivingEntity mob) {
-            String m = mob.getName().getString();
+            String weapon = mob.getMainHandItem().isEmpty()
+                    ? "claws"
+                    : mob.getMainHandItem().getHoverName().getString();
 
-            String weapon = "claws"; // default
-            ItemStack weaponStack = mob.getMainHandItem();
-            if (!weaponStack.isEmpty() && weaponStack.getItem() != Items.AIR) {
-                weapon = weaponStack.getHoverName().getString();
-            }
-
-            List<String> pool = messages.get("mobKills");
-            message = pick(pool)
+            message = pick(messages.get("mobKills"))
                     .replace("{player}", victim)
-                    .replace("{mob}", m)
+                    .replace("{mob}", mob.getName().getString())
                     .replace("{weapon}", weapon);
-
-            // Environment / other deaths
         } else {
-            String type = source.getMsgId();
-            switch (type) {
-                case "fall" -> message = pick(messages.get("fall")).replace("{player}", victim);
-                case "inFire", "onFire" -> message = pick(messages.get("fire")).replace("{player}", victim);
-                case "lava" -> message = pick(messages.get("lava")).replace("{player}", victim);
-                case "explosion", "explosion.player", "explosion.mob" -> message = pick(messages.get("explode")).replace("{player}", victim);
-                case "drown" -> message = pick(messages.get("drown")).replace("{player}", victim);
-                case "outOfWorld" -> message = pick(messages.get("void")).replace("{player}", victim);
-                case "magic" -> message = pick(messages.get("magic")).replace("{player}", victim);
-                case "inWall" -> message = pick(messages.get("suffocate")).replace("{player}", victim);
-                default -> message = pick(messages.get("generic")).replace("{player}", victim);
-            }
+            message = pick(messages.getOrDefault(source.getMsgId(), messages.get("generic")))
+                    .replace("{player}", victim);
         }
 
-        // Broadcast custom death message
-        event.setCanceled(true);
-        player.getServer().getPlayerList().broadcastSystemMessage(Component.literal(message), false);
+        // Override vanilla death message WITHOUT cancelling death
+        player.getServer().getPlayerList()
+                .broadcastSystemMessage(Component.literal(message), false);
+
+
     }
 
     private static String pick(List<String> list) {

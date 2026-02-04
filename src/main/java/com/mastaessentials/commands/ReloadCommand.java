@@ -1,10 +1,8 @@
 package com.mastaessentials.commands;
 
 import com.mastaessentials.rankup.RankCommand;
-import com.mastaessentials.afk.AfkManager;
 import com.mastaessentials.JoinandLeave.JoinLeaveMessages;
 import com.mastaessentials.deathmessages.DeathMessages;
-import com.mastaessentials.tpa.TpaManager; // <-- ADD THIS
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -31,7 +29,6 @@ public class ReloadCommand {
             RankCommand.loadConfig(server);
 
             // Reload AFK config
-            AfkManager.loadConfig();
 
             // 🔥 Reload Join / Leave messages
             JoinLeaveMessages.reloadConfig();
@@ -40,7 +37,6 @@ public class ReloadCommand {
             DeathMessages.loadConfig();
 
             // 🌀 Reload TPA config
-            TpaManager.loadConfig(); // <-- This will reload Tpa.json
             ChatManager.loadConfig();
         }
 

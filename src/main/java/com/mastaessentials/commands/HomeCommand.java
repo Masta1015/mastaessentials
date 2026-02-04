@@ -50,7 +50,11 @@ public class HomeCommand {
     private static Map<String, String> MESSAGES = new HashMap<>();
 
     private static final Gson GSON = new Gson().newBuilder().setPrettyPrinting().create();
-    private static final Path HOMES_FILE = FMLPaths.CONFIGDIR.get().resolve("MastaConfig").resolve("HomeStorage.json");
+    private static final Path HOMES_FILE = FMLPaths.CONFIGDIR
+            .get()
+            .resolve("MastaConfig")
+            .resolve("HomeStorage") // folder
+            .resolve("HomeStorage.json"); // file
     private static final Path CONFIG_FILE = FMLPaths.CONFIGDIR.get().resolve("MastaConfig").resolve("HomeConfig.json");
 
     // -------------------- Command Registration --------------------
