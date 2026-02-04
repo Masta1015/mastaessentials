@@ -24,3 +24,10 @@ mandatory=true
 versionRange="[1.20.1,1.21)"
 ordering="NONE"
 side="BOTH"
+
+[[dependencies.mastaessentials]]
+modId="ftbessentials"
+mandatory=false
+versionRange="[0,)"
+ordering="AFTER"
+side="BOTH"
